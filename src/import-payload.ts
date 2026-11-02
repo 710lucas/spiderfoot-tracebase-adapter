@@ -21,7 +21,10 @@ export interface RelationPayload {
 export interface AttributePayload {
   entity: EntityReference;
   name: string;
-  // Everything one module found together under one parent event (see `attribute-groups.ts`).
+  // The module that found the set, so that what different modules say about the same entity and name
+  // lives side by side (see the API's glossary, "Qualifier"). Left out when the event has no module.
+  qualifier?: string;
+  // Everything one module found about the entity under this name (see `attribute-groups.ts`).
   values: string[];
   provenance: ItemProvenance;
 }

@@ -217,7 +217,7 @@ test("the recordRef of the attribute is the parent event, where the values were 
   assert.equal(mapped.attributes[0]?.provenance.recordRef, "url");
 });
 
-test("a different parent, type or module is a different attribute", () => {
+test("a different type or module is a different attribute, a different parent is not", () => {
   const content = event({
     hash: "content",
     type: "TARGET_WEB_CONTENT",
@@ -248,9 +248,19 @@ test("a different parent, type or module is a different attribute", () => {
     ...headersUnder("content", "b: 2"),
   ]);
 
-  // content (parent url), HASH (parent content), headers from sfp_strangeheaders under url, the same
-  // header from sfp_other under url, and headers under content: five groups.
-  assert.equal(mapped.attributes.length, 5);
+  // content, HASH, the headers of sfp_strangeheaders (under url and under content, one parent each, but
+  // the same entity, type and module: ONE attribute) and the same header from sfp_other: four attributes.
+  assert.equal(mapped.attributes.length, 4);
+  const headers = mapped.attributes.find(
+    (attribute) => attribute.qualifier === "sfp_strangeheaders",
+  );
+  assert.deepEqual(headers?.values, ["a: 1", "b: 2"]);
+  assert.deepEqual(mapped.attributes.map((attribute) => attribute.qualifier).toSorted(), [
+    "sfp_module",
+    "sfp_module",
+    "sfp_other",
+    "sfp_strangeheaders",
+  ]);
 });
 
 test("a repeated value is kept once and a blank one is counted and left out", () => {

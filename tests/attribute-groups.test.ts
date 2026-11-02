@@ -29,6 +29,7 @@ test("an event alone is a group of one value", () => {
     {
       entity: owner,
       name: "HASH",
+      qualifier: "sfp_hashes",
       values: ["[MD5] 1"],
       provenance: { confidence: 100, observedAt: 1000000, recordRef: "content" },
     },
@@ -72,4 +73,67 @@ test("a field only some events sent is taken from the ones that sent it", () => 
     confidence: 80,
     observedAt: 5,
   });
+});
+
+test("the module is the qualifier, and different modules are different attributes", () => {
+  const groups = createAttributeGroups();
+
+  groups.add(event({ type: "MALICIOUS_SUBNET", module: "sfp_cinsscore" }), owner, "a", {});
+  groups.add(event({ type: "MALICIOUS_SUBNET", module: "sfp_blocklistde" }), owner, "b", {});
+
+  assert.deepEqual(
+    groups.toPayloads().map((attribute) => [attribute.name, attribute.qualifier, attribute.values]),
+    [
+      ["MALICIOUS_SUBNET", "sfp_cinsscore", ["a"]],
+      ["MALICIOUS_SUBNET", "sfp_blocklistde", ["b"]],
+    ],
+  );
+});
+
+test("an event with no module has no qualifier", () => {
+  const groups = createAttributeGroups();
+
+  groups.add(event({ module: "" }), owner, "a", {});
+
+  assert.equal("qualifier" in (groups.toPayloads()[0] ?? {}), false);
+});
+
+test("the same module reaching an entity through two parents is one attribute with every value", () => {
+  const groups = createAttributeGroups();
+
+  groups.add(event({ parentHash: "page" }), owner, "[MD5] 1", { observedAt: 1000 });
+  groups.add(event({ parentHash: "dns" }), owner, "[SHA1] 2", { observedAt: 2000 });
+
+  const [attribute, ...others] = groups.toPayloads();
+
+  assert.equal(others.length, 0);
+  assert.deepEqual(attribute?.values, ["[MD5] 1", "[SHA1] 2"]);
+});
+
+test("the recordRef is the parent of the latest event, whatever the order they came in", () => {
+  const groups = createAttributeGroups();
+
+  groups.add(event({ parentHash: "late" }), owner, "a", { observedAt: 5000 });
+  groups.add(event({ parentHash: "early" }), owner, "b", { observedAt: 1000 });
+
+  assert.equal(groups.toPayloads()[0]?.provenance.recordRef, "late");
+});
+
+test("on a tie in time the recordRef stays with the first parent", () => {
+  const groups = createAttributeGroups();
+
+  groups.add(event({ parentHash: "first" }), owner, "a", { observedAt: 1000 });
+  groups.add(event({ parentHash: "second" }), owner, "b", { observedAt: 1000 });
+
+  assert.equal(groups.toPayloads()[0]?.provenance.recordRef, "first");
+});
+
+test("two entities never share a group, even for the same type and module", () => {
+  const groups = createAttributeGroups();
+  const other = { type: "LINKED_URL_INTERNAL", value: "http://y/" };
+
+  groups.add(event(), owner, "a", {});
+  groups.add(event(), other, "b", {});
+
+  assert.equal(groups.toPayloads().length, 2);
 });
