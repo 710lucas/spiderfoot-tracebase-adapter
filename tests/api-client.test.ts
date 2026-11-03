@@ -9,7 +9,7 @@ function relation(value: string): RelationPayload {
   return {
     source: { type: "A", value: "source" },
     target: { type: "B", value },
-    provenance: { recordRef: value },
+    provenance: { recordRefs: [value] },
   };
 }
 

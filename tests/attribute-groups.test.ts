@@ -23,7 +23,11 @@ function event(overrides: Partial<ScanEvent> = {}): ScanEvent {
 test("an event alone is a group of one value", () => {
   const groups = createAttributeGroups();
 
-  groups.add(event(), owner, "[MD5] 1", { confidence: 100, observedAt: 1000000 });
+  groups.add(event(), owner, "[MD5] 1", {
+    confidence: 100,
+    observedAt: 1000000,
+    recordRefs: ["e1"],
+  });
 
   assert.deepEqual(groups.toPayloads(), [
     {
@@ -31,7 +35,7 @@ test("an event alone is a group of one value", () => {
       name: "HASH",
       qualifier: "sfp_hashes",
       values: ["[MD5] 1"],
-      provenance: { confidence: 100, observedAt: 1000000, recordRef: "content" },
+      provenance: { confidence: 100, observedAt: 1000000, recordRefs: ["e1"] },
     },
   ]);
 });
@@ -58,7 +62,7 @@ test("provenance fields the events did not send stay out of the group", () => {
   groups.add(event(), owner, "one", {});
   groups.add(event(), owner, "two", {});
 
-  assert.deepEqual(groups.toPayloads()[0]?.provenance, { recordRef: "content" });
+  assert.deepEqual(groups.toPayloads()[0]?.provenance, {});
 });
 
 test("a field only some events sent is taken from the ones that sent it", () => {
@@ -68,11 +72,7 @@ test("a field only some events sent is taken from the ones that sent it", () => 
   groups.add(event(), owner, "two", { confidence: 80, observedAt: 5 });
   groups.add(event(), owner, "three", {});
 
-  assert.deepEqual(groups.toPayloads()[0]?.provenance, {
-    recordRef: "content",
-    confidence: 80,
-    observedAt: 5,
-  });
+  assert.deepEqual(groups.toPayloads()[0]?.provenance, { confidence: 80, observedAt: 5 });
 });
 
 test("the module is the qualifier, and different modules are different attributes", () => {
@@ -110,22 +110,14 @@ test("the same module reaching an entity through two parents is one attribute wi
   assert.deepEqual(attribute?.values, ["[MD5] 1", "[SHA1] 2"]);
 });
 
-test("the recordRef is the parent of the latest event, whatever the order they came in", () => {
+test("the recordRefs are the events that carry the values, each once, whatever the parents", () => {
   const groups = createAttributeGroups();
 
-  groups.add(event({ parentHash: "late" }), owner, "a", { observedAt: 5000 });
-  groups.add(event({ parentHash: "early" }), owner, "b", { observedAt: 1000 });
+  groups.add(event({ parentHash: "page" }), owner, "[MD5] 1", { recordRefs: ["e1"] });
+  groups.add(event({ parentHash: "dns" }), owner, "[SHA1] 2", { recordRefs: ["e2"] });
+  groups.add(event({ parentHash: "dns" }), owner, "[SHA1] 2", { recordRefs: ["e2"] });
 
-  assert.equal(groups.toPayloads()[0]?.provenance.recordRef, "late");
-});
-
-test("on a tie in time the recordRef stays with the first parent", () => {
-  const groups = createAttributeGroups();
-
-  groups.add(event({ parentHash: "first" }), owner, "a", { observedAt: 1000 });
-  groups.add(event({ parentHash: "second" }), owner, "b", { observedAt: 1000 });
-
-  assert.equal(groups.toPayloads()[0]?.provenance.recordRef, "first");
+  assert.deepEqual(groups.toPayloads()[0]?.provenance.recordRefs, ["e1", "e2"]);
 });
 
 test("two entities never share a group, even for the same type and module", () => {

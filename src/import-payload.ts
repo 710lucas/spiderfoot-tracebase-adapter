@@ -6,7 +6,8 @@ export interface EntityReference {
 }
 
 export interface ItemProvenance {
-  recordRef?: string;
+  // The hash of every SpiderFoot event behind the item (see `relation-groups.ts`, `attribute-groups.ts`).
+  recordRefs?: string[];
   module?: string;
   confidence?: number;
   observedAt?: number;

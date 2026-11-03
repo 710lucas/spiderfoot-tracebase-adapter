@@ -1,4 +1,5 @@
 import type { AttributePayload, EntityReference, ItemProvenance } from "./import-payload.ts";
+import { mergeProvenance } from "./provenance-merge.ts";
 import type { ScanEvent } from "./scan-reader.ts";
 
 export interface AttributeGroups {
@@ -27,11 +28,9 @@ interface AttributeGroup {
 // blocklists listing one network) are different sources, so they are different attributes and none
 // replaces another. Without a module there is no qualifier.
 //
-// The provenance of a group has to speak for several events:
-// - `recordRef` is the hash of the parent event of the latest event, the event the latest values were
-//   found in (and where the raw data of the finding will be kept). The other parents are not kept yet;
-// - `confidence` is the lowest of the group, the conservative reading;
-// - `observedAt` is the latest of the group, since the set is only complete when its last event exists.
+// The provenance of a group has to speak for several events, and is merged by `mergeProvenance`:
+// `recordRefs` lists the hash of every event that carries a value of the set (not their parents), the
+// confidence is the lowest and `observedAt` the latest.
 export function createAttributeGroups(): AttributeGroups {
   const groups = new Map<string, AttributeGroup>();
 
@@ -47,13 +46,13 @@ export function createAttributeGroups(): AttributeGroups {
           name: event.type,
           ...(event.module !== "" && { qualifier: event.module }),
           values: new Set([value]),
-          provenance: { ...provenance, recordRef: event.parentHash },
+          provenance,
         });
         return;
       }
 
       group.values.add(value);
-      group.provenance = mergeProvenance(group.provenance, provenance, event.parentHash);
+      group.provenance = mergeProvenance(group.provenance, provenance);
     },
 
     toPayloads: () =>
@@ -65,33 +64,4 @@ export function createAttributeGroups(): AttributeGroups {
         provenance: group.provenance,
       })),
   };
-}
-
-function mergeProvenance(
-  group: ItemProvenance,
-  event: ItemProvenance,
-  eventParentHash: string,
-): ItemProvenance {
-  const confidence = pick(Math.min, group.confidence, event.confidence);
-  const observedAt = pick(Math.max, group.observedAt, event.observedAt);
-  // The reference follows the latest event; on a tie (or when no date exists) the first one stays.
-  const isLater = (event.observedAt ?? -Infinity) > (group.observedAt ?? -Infinity);
-
-  return {
-    ...group,
-    ...(isLater && { recordRef: eventParentHash }),
-    ...(confidence !== undefined && { confidence }),
-    ...(observedAt !== undefined && { observedAt }),
-  };
-}
-
-// The result of `choose` over the numbers that exist; `undefined` when neither does.
-function pick(
-  choose: (...numbers: number[]) => number,
-  first: number | undefined,
-  second: number | undefined,
-): number | undefined {
-  const existing = [first, second].filter((number) => number !== undefined);
-
-  return existing.length === 0 ? undefined : choose(...existing);
 }

@@ -5,6 +5,7 @@ import type {
   RelationPayload,
 } from "./import-payload.ts";
 import { createAttributeGroups } from "./attribute-groups.ts";
+import { createRelationGroups } from "./relation-groups.ts";
 import type { ScanEvent } from "./scan-reader.ts";
 
 export interface MappedScan {
@@ -45,8 +46,9 @@ const UNKNOWN_TARGET_TYPE = "ROOT";
 //
 // SpiderFoot already says what each event is: ENTITY and SUBENTITY events are things found (they
 // become entities linked to the thing that led to them); DESCRIPTOR and DATA events describe a thing
-// (they become attributes of the nearest entity above them, the ones found together by one module under
-// one parent event as a single attribute, see `attribute-groups.ts`); INTERNAL is the scan target.
+// (they become attributes of the nearest entity above them, the ones one module found about one entity
+// under one type as a single attribute, see `attribute-groups.ts`; the relations reported more than once
+// are joined into one, see `relation-groups.ts`); INTERNAL is the scan target.
 //
 // Events with no usable text, and events whose chain of parents never reaches an entity, are counted
 // instead of sent: the API rejects a whole batch for a single blank value.
@@ -54,6 +56,7 @@ export function mapScanEvents(events: ScanEvent[]): MappedScan {
   const eventsByHash = new Map(events.map((event) => [event.hash, event]));
   const mapped: MappedScan = { relations: [], attributes: [], falsePositives: 0, withoutEntity: 0 };
   const attributeGroups = createAttributeGroups();
+  const relationGroups = createRelationGroups();
 
   for (const event of events) {
     if (event.kind === INTERNAL_KIND) {
@@ -71,11 +74,12 @@ export function mapScanEvents(events: ScanEvent[]): MappedScan {
     }
     const provenance = buildProvenance(event);
     if (ENTITY_KINDS.has(event.kind)) {
-      mapped.relations.push({ source: owner, target: { type: event.type, value }, provenance });
+      relationGroups.add({ source: owner, target: { type: event.type, value }, provenance });
     } else if (ATTRIBUTE_KINDS.has(event.kind)) {
       attributeGroups.add(event, owner, value, provenance);
     }
   }
+  mapped.relations = relationGroups.toPayloads();
   mapped.attributes = attributeGroups.toPayloads();
   return mapped;
 }
@@ -118,7 +122,7 @@ function cleanEventData(data: string): string {
 
 function buildProvenance(event: ScanEvent): ItemProvenance {
   return {
-    recordRef: event.hash,
+    recordRefs: [event.hash],
     ...(event.module !== "" && { module: event.module }),
     confidence: event.confidence,
     observedAt: Math.round(event.generatedAtSeconds * 1000),

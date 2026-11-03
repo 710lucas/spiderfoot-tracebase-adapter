@@ -30,7 +30,7 @@ test("an entity found from the scan target becomes a relation from the target", 
       source: { type: "INTERNET_NAME", value: "example.com" },
       target: { type: "IP_ADDRESS", value: "93.184.216.34" },
       provenance: {
-        recordRef: "a",
+        recordRefs: ["a"],
         module: "sfp_module",
         confidence: 100,
         observedAt: 1000400,
@@ -211,10 +211,38 @@ test("events of one type and module under one parent become a single attribute w
   ]);
 });
 
-test("the recordRef of the attribute is the parent event, where the values were found", () => {
+test("the recordRefs of the attribute are the events that carry its values, not their parent", () => {
   const mapped = mapScanEvents([root, url, ...headersUnder("url", "a: 1", "b: 2")]);
 
-  assert.equal(mapped.attributes[0]?.provenance.recordRef, "url");
+  assert.deepEqual(mapped.attributes[0]?.provenance.recordRefs, ["header-url-0", "header-url-1"]);
+});
+
+test("a link reported twice is ONE relation that lists both events", () => {
+  const first = event({
+    hash: "link-1",
+    type: "IP_ADDRESS",
+    data: "1.1.1.1",
+    generatedAtSeconds: 1000.1,
+  });
+  const again = event({
+    hash: "link-2",
+    type: "IP_ADDRESS",
+    data: "1.1.1.1",
+    generatedAtSeconds: 1000.4,
+  });
+
+  const mapped = mapScanEvents([root, first, again]);
+
+  assert.equal(mapped.relations.length, 1);
+  assert.deepEqual(mapped.relations[0]?.provenance.recordRefs, ["link-1", "link-2"]);
+  assert.equal(mapped.relations[0]?.provenance.observedAt, 1000400);
+});
+
+test("the same link found by two modules stays as two relations", () => {
+  const byOne = event({ hash: "m1", type: "IP_ADDRESS", data: "1.1.1.1", module: "sfp_a" });
+  const byOther = event({ hash: "m2", type: "IP_ADDRESS", data: "1.1.1.1", module: "sfp_b" });
+
+  assert.equal(mapScanEvents([root, byOne, byOther]).relations.length, 2);
 });
 
 test("a different type or module is a different attribute, a different parent is not", () => {
