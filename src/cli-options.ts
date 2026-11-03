@@ -2,7 +2,7 @@ import { parseArgs } from "node:util";
 import type { DatabaseSource } from "./open-database.ts";
 import { ReaderError } from "./reader-error.ts";
 
-export const DEFAULT_API_URL = "http://localhost:3000";
+export const DEFAULT_API_URL = "http://localhost:3333";
 export const DEFAULT_MAX_BATCH_BYTES = 90_000;
 
 export const USAGE = `spiderfoot-reader: sends SpiderFoot scans to the OSINT graph import API

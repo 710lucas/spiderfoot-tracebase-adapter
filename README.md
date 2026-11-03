@@ -17,7 +17,7 @@ node src/main.ts scan <scan-id> --mode docker
 
 ```bash
 node src/main.ts list --mode local
-node src/main.ts scan <scan-id> --mode local --api http://localhost:3000
+node src/main.ts scan <scan-id> --mode local --api http://localhost:3333
 ```
 
 - `list` prints the scans (id, status, number of events, target, name).
@@ -29,7 +29,7 @@ node src/main.ts scan <scan-id> --mode local --api http://localhost:3000
 | `--mode local\|docker` | Where SpiderFoot runs. Required. |
 | `--db <path>` | local: the `spiderfoot.db` file. Default: `$SPIDERFOOT_DATA` or `~/.spiderfoot`. |
 | `--container <name>` | docker: the SpiderFoot container. Default: the only one found by `docker ps -a`. |
-| `--api <url>` | The import API. Default: `$OSINT_API` or `http://localhost:3000`. |
+| `--api <url>` | The import API. Default: `$OSINT_API` or `http://localhost:3333`. |
 | `--max-batch-bytes <n>` | Largest request body. Default 90000 (the API reads 100 KB by default). |
 
 How it reads, how events become graph data and what to watch out for: [`docs/README.md`](docs/README.md).
